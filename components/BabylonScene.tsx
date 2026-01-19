@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import * as BABYLON from 'babylonjs';
 import { babylonEngine } from '@/lib/babylon/engine';
 import { createPlane } from '@/lib/babylon/plane';
@@ -24,7 +24,7 @@ const UPDATE_RATE_MS = 50;
 
 const getFlightStatus = (speed: number, altitude: number, verticalSpeed: number, throttle: number): FlightStatus => {
   if (speed === 0 && throttle === 0) return 'parked';
-  if (speed > 0 && altitude < 50) return speed < 100 ? 'taxiing' : 'takeoff';
+  if (speed > 0 && altitude < 50) return speed < 80 ? 'taxiing' : 'takeoff';
   if (altitude > 50 && altitude < 5000) {
     if (verticalSpeed > 100) return 'climbing';
     if (verticalSpeed < -100) return 'descending';
@@ -54,15 +54,17 @@ export default function BabylonScene() {
     gear: true,
     brake: false,
   });
+  const keysRef = useRef<Set<string>>(new Set());
   const lastUpdateRef = useRef<number>(0);
   const hasTakenOffRef = useRef<boolean>(false);
   const sceneRef = useRef<BABYLON.Scene | null>(null);
+  const [cameraMode, setCameraMode] = useState<'follow' | 'arc'>('follow');
   
   const {
     setSpeed,
     setAltitude,
     setHeading,
-    setThrottle,
+    setThrottle: setThrottleStore,
     setFlaps,
     setGear,
     setFuel,
@@ -79,59 +81,44 @@ export default function BabylonScene() {
     setPlayers,
   } = useGameStore();
 
-  const handleInput = useCallback((event: KeyboardEvent, isDown: boolean) => {
+  const handleInput = useCallback(() => {
     if (!planeRef.current) return;
     
-    switch (event.code) {
-      case 'KeyW':
-        inputRef.current.throttle = isDown ? 100 : 0;
-        break;
-      case 'KeyS':
-        inputRef.current.throttle = isDown ? 0 : 0;
-        break;
-      case 'ArrowUp':
-        inputRef.current.elevator = isDown ? -1 : 0;
-        break;
-      case 'ArrowDown':
-        inputRef.current.elevator = isDown ? 1 : 0;
-        break;
-      case 'ArrowLeft':
-        inputRef.current.rudder = isDown ? 1 : 0;
-        break;
-      case 'ArrowRight':
-        inputRef.current.rudder = isDown ? -1 : 0;
-        break;
-      case 'KeyA':
-        inputRef.current.aileron = isDown ? 1 : 0;
-        break;
-      case 'KeyD':
-        inputRef.current.aileron = isDown ? -1 : 0;
-        break;
-      case 'KeyF':
-        if (isDown) {
-          inputRef.current.flaps = (inputRef.current.flaps + 1) % 4;
-        }
-        break;
-      case 'KeyG':
-        if (isDown) {
-          inputRef.current.gear = !inputRef.current.gear;
-        }
-        break;
-      case 'Space':
-        inputRef.current.brake = isDown;
-        break;
-      case 'KeyC':
-        if (isDown) {
-          const camera = babylonEngine.getCamera();
-          const arcCamera = babylonEngine.getArcCamera();
-          if (camera && sceneRef.current?.activeCamera !== camera) {
-            babylonEngine.switchToFollowCamera();
-          } else if (arcCamera) {
-            babylonEngine.switchToArcCamera();
-          }
-        }
-        break;
+    const keys = keysRef.current;
+    
+    let newThrottle = inputRef.current.throttle;
+    let newElevator = 0;
+    let newRudder = 0;
+    let newAileron = 0;
+    
+    if (keys.has('KeyW')) {
+      newThrottle = Math.min(100, newThrottle + 1.5);
+    } else if (keys.has('KeyS')) {
+      newThrottle = Math.max(0, newThrottle - 2);
     }
+    
+    if (keys.has('ArrowUp')) {
+      newElevator = -1;
+    } else if (keys.has('ArrowDown')) {
+      newElevator = 1;
+    }
+    
+    if (keys.has('ArrowLeft')) {
+      newRudder = 1;
+    } else if (keys.has('ArrowRight')) {
+      newRudder = -1;
+    }
+    
+    if (keys.has('KeyA')) {
+      newAileron = 1;
+    } else if (keys.has('KeyD')) {
+      newAileron = -1;
+    }
+    
+    inputRef.current.throttle = newThrottle;
+    inputRef.current.elevator = newElevator;
+    inputRef.current.rudder = newRudder;
+    inputRef.current.aileron = newAileron;
     
     planeRef.current.setInput(inputRef.current);
   }, []);
@@ -145,10 +132,11 @@ export default function BabylonScene() {
     const scene = babylonEngine.createScene();
     sceneRef.current = scene;
     
-    const airport = createAirport(scene);
+    createAirport(scene);
     
     const plane = createPlane(scene);
     planeRef.current = plane;
+    plane.reset();
     
     plane.loadModel('/models/a320.glb').catch(() => {
       console.log('Using procedural A320 model');
@@ -171,8 +159,42 @@ export default function BabylonScene() {
     const handleResize = () => engine.resize();
     window.addEventListener('resize', handleResize);
     
-    const handleKeyDown = (e: KeyboardEvent) => handleInput(e, true);
-    const handleKeyUp = (e: KeyboardEvent) => handleInput(e, false);
+    const handleKeyDown = (e: KeyboardEvent) => {
+      keysRef.current.add(e.code);
+      
+      switch (e.code) {
+        case 'KeyF':
+          inputRef.current.flaps = (inputRef.current.flaps + 1) % 4;
+          break;
+        case 'KeyG':
+          inputRef.current.gear = !inputRef.current.gear;
+          break;
+        case 'Space':
+          inputRef.current.brake = true;
+          e.preventDefault();
+          break;
+        case 'KeyC':
+          setCameraMode(prev => {
+            const newMode = prev === 'follow' ? 'arc' : 'follow';
+            if (newMode === 'follow') {
+              babylonEngine.switchToFollowCamera();
+            } else {
+              babylonEngine.switchToArcCamera();
+            }
+            return newMode;
+          });
+          break;
+      }
+    };
+    
+    const handleKeyUp = (e: KeyboardEvent) => {
+      keysRef.current.delete(e.code);
+      
+      if (e.code === 'Space') {
+        inputRef.current.brake = false;
+      }
+    };
+    
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
     
@@ -184,7 +206,7 @@ export default function BabylonScene() {
       window.removeEventListener('keyup', handleKeyUp);
       babylonEngine.dispose();
     };
-  }, [startGame, handleInput]);
+  }, [startGame]);
 
   useEffect(() => {
     if (!roomId) return;
@@ -211,7 +233,7 @@ export default function BabylonScene() {
       setConnected(false);
     });
 
-    socket.on('room-joined', (room: any, playersList: MultiplayerPlayer[]) => {
+    socket.on('room-joined', (room: { id: string }, playersList: MultiplayerPlayer[]) => {
       console.log('Joined room:', room.id);
       setPlayers(playersList);
       
@@ -236,7 +258,7 @@ export default function BabylonScene() {
       updatePlayer(playerId, data);
     });
 
-    socket.on('game-state', (state: any) => {
+    socket.on('game-state', (state: { players?: MultiplayerPlayer[] }) => {
       if (state.players) {
         setPlayers(state.players);
         state.players.forEach((p: MultiplayerPlayer) => {
@@ -272,6 +294,8 @@ export default function BabylonScene() {
     });
 
     const updateCallback = () => {
+      handleInput();
+      
       const plane = planeRef.current;
       if (!plane) return;
       
@@ -297,7 +321,7 @@ export default function BabylonScene() {
       setSpeed(state.speed);
       setAltitude(altFeet);
       setHeading(state.heading);
-      setThrottle(inputRef.current.throttle);
+      setThrottleStore(inputRef.current.throttle);
       setFlaps(inputRef.current.flaps);
       setGear(inputRef.current.gear);
       setFuel(state.fuel);
@@ -345,13 +369,18 @@ export default function BabylonScene() {
       scene.onBeforeRenderObservable.removeCallback(updateCallback);
       multiplayerManager.clear();
     };
-  }, [setSpeed, setAltitude, setHeading, setThrottle, setFlaps, setGear, setFuel, setVerticalSpeed, setFlightStatus, setHasTakenOff, roomId, players, updatePlayer]);
+  }, [handleInput, setSpeed, setAltitude, setHeading, setThrottleStore, setFlaps, setGear, setFuel, setVerticalSpeed, setFlightStatus, setHasTakenOff, roomId, players, updatePlayer, setPlayers, addPlayer]);
 
   return (
-    <canvas
-      ref={canvasRef}
-      className="w-full h-full block"
-      style={{ touchAction: 'none' }}
-    />
+    <>
+      <canvas
+        ref={canvasRef}
+        className="w-full h-full block"
+        style={{ touchAction: 'none' }}
+      />
+      <div className="fixed top-4 left-4 bg-black/70 text-white px-3 py-2 rounded-lg font-mono text-sm">
+        Camera: {cameraMode === 'follow' ? 'Follow (C)' : 'Orbit (C)'}
+      </div>
+    </>
   );
 }

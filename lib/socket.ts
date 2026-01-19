@@ -143,7 +143,7 @@ export function useSocket(options: UseSocketOptions = {}) {
       setChatMessages(prev => [...prev.slice(-50), message]);
     });
 
-    socket.on('game-state', (state: any) => {
+    socket.on('game-state', (state: { players?: Player[] }) => {
       if (state.players) {
         const playerMap = new Map<string, Player>();
         state.players.forEach((p: Player) => playerMap.set(p.id, p));
@@ -194,7 +194,6 @@ export function useSocket(options: UseSocketOptions = {}) {
   }, []);
 
   return {
-    socket: socketRef.current,
     isConnected,
     rooms,
     currentRoom,

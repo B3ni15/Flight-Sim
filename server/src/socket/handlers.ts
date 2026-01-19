@@ -88,16 +88,21 @@ interface RoomInfo {
 type TypedServer = Server<ClientToServerEvents, ServerToClientEvents>;
 type TypedSocket = Socket<ClientToServerEvents, ServerToClientEvents>;
 
+interface ExtendedSocket extends Socket {
+  nickname?: string;
+  roomId?: string;
+}
+
 export function setupSocketHandlers(io: TypedServer): void {
-  io.on('connection', (socket: TypedSocket) => {
+  io.on('connection', (socket: ExtendedSocket) => {
     console.log(`Player connected: ${socket.id}`);
     const nickname = `Player_${socket.id.substring(0, 4)}`;
-    (socket as any).nickname = nickname;
+    socket.nickname = nickname;
 
     socket.on('create-room', (data: CreateRoomData) => {
       const room = gameManager.createRoom(socket.id, nickname, data);
       socket.join(room.id);
-      (socket as any).roomId = room.id;
+      socket.roomId = room.id;
       
       socket.emit('room-created', room.id, room);
       console.log(`Room created: ${room.id} by ${socket.id}`);
@@ -107,13 +112,13 @@ export function setupSocketHandlers(io: TypedServer): void {
       const result = gameManager.joinRoom(
         data.roomId,
         socket.id,
-        (socket as any).nickname,
+        socket.nickname || `Player_${socket.id.substring(0, 4)}`,
         data.password
       );
 
       if (result.success && result.room) {
         socket.join(result.room.id);
-        (socket as any).roomId = result.room.id;
+        socket.roomId = result.room.id;
 
         const players = Array.from(result.room.players.values());
         socket.emit('room-joined', result.room, players);
@@ -206,8 +211,8 @@ export function setupSocketHandlers(io: TypedServer): void {
   }, 5000);
 }
 
-function handleLeaveRoom(socket: TypedSocket, io: TypedServer): void {
-  const roomId = (socket as any).roomId;
+function handleLeaveRoom(socket: ExtendedSocket, io: TypedServer): void {
+  const roomId = socket.roomId;
   if (!roomId) return;
 
   const room = gameManager.leaveRoom(socket.id);
@@ -217,6 +222,6 @@ function handleLeaveRoom(socket: TypedSocket, io: TypedServer): void {
     socket.to(roomId).emit('player-left', socket.id);
   }
 
-  (socket as any).roomId = null;
+  socket.roomId = undefined;
   console.log(`${socket.id} left room ${roomId}`);
 }
