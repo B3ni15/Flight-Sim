@@ -8,6 +8,7 @@ A realistic multiplayer flight simulator built with Next.js 16, Babylon.js 7, an
 - **Procedural 3D Models**: Detailed A320 aircraft and airport built with code
 - **Interactive Controls**: Full flight controls (throttle, elevator, rudder, aileron, flaps, gear)
 - **Multiplayer Lobby**: Create/join rooms, chat with players, real-time updates
+- **Real-time Multiplayer**: See other players' planes flying in the same world
 - **Modern UI**: HUD with speed, altitude, heading, fuel, and more
 
 ## Getting Started
@@ -49,6 +50,15 @@ The game features a full multiplayer lobby system:
 - **Player Ready System**: Mark yourself as ready to start
 - **Auto-refresh**: Room list updates automatically
 
+## Multiplayer Synchronization
+
+The game includes real-time position and rotation synchronization:
+
+- **Position Sync**: See other players' planes in real-time
+- **Interpolation**: Smooth movement between updates (50ms rate)
+- **Color Coding**: Each player has a unique color
+- **Player Names**: Display player nicknames in-game
+
 ## 3D Models
 
 This project uses **procedural 3D models** - no external downloads needed!
@@ -83,7 +93,7 @@ flight-sim/
 │   └── lobby/
 │       └── page.tsx       # Multiplayer lobby
 ├── components/
-│   ├── BabylonScene.tsx   # 3D scene wrapper
+│   ├── BabylonScene.tsx   # 3D scene wrapper + multiplayer sync
 │   └── UI/
 │       └── HUD.tsx        # Heads-up display
 ├── lib/
@@ -91,8 +101,9 @@ flight-sim/
 │   │   ├── engine.ts      # Babylon.js setup
 │   │   ├── physics.ts     # A320 flight physics
 │   │   ├── plane.ts       # Procedural A320 model
-│   │   └── airport.ts     # Procedural airport
-│   └── socket.ts          # Socket.io client
+│   │   ├── airport.ts     # Procedural airport
+│   │   └── multiplayer.ts # Multiplayer plane meshes + sync
+│   └── socket.ts          # Socket.io client hook
 ├── server/
 │   └── src/
 │       ├── index.ts       # Express + Socket.io server
@@ -130,9 +141,10 @@ The A320 physics simulation includes:
 - [x] Realistic physics
 - [x] Socket.io multiplayer
 - [x] Lobby system
+- [x] Game state synchronization
 - [ ] Player profiles & statistics
-- [ ] Game state synchronization
 - [ ] Custom model support
+- [ ] Voice chat
 
 ## License
 

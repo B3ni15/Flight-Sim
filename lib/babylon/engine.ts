@@ -5,7 +5,8 @@ export class BabylonEngine {
   private engine: BABYLON.Engine | null = null;
   private scene: BABYLON.Scene | null = null;
   private canvas: HTMLCanvasElement | null = null;
-  private camera: BABYLON.ArcRotateCamera | null = null;
+  private camera: BABYLON.FollowCamera | null = null;
+  private targetMesh: BABYLON.Mesh | null = null;
 
   init(canvas: HTMLCanvasElement): BABYLON.Engine {
     this.canvas = canvas;
@@ -30,6 +31,7 @@ export class BabylonEngine {
     this.setupLights();
     this.setupSkybox();
     this.setupGround();
+    this.setupFog();
 
     return this.scene;
   }
@@ -37,26 +39,29 @@ export class BabylonEngine {
   private setupCamera(): void {
     if (!this.scene || !this.canvas) return;
 
-    this.camera = new BABYLON.ArcRotateCamera(
-      'camera',
-      Math.PI / 2,
-      Math.PI / 3,
-      50,
-      BABYLON.Vector3.Zero(),
-      this.scene
-    );
-    this.camera.attachControl(this.canvas, true);
-    this.camera.lowerRadiusLimit = 10;
-    this.camera.upperRadiusLimit = 200;
-    this.camera.lowerBetaLimit = 0.1;
-    this.camera.upperBetaLimit = Math.PI / 2 - 0.1;
+    const camera = new BABYLON.FollowCamera('followCamera', new BABYLON.Vector3(0, 10, -50), this.scene);
+    camera.radius = 60;
+    camera.heightOffset = 20;
+    camera.rotationOffset = 180;
+    camera.cameraAcceleration = 0.03;
+    camera.maxCameraSpeed = 20;
+    camera.lowerRadiusLimit = 20;
+    camera.upperRadiusLimit = 150;
     
-    this.scene.activeCamera = this.camera;
+    this.camera = camera;
+    this.scene.activeCamera = camera;
   }
 
-  setupFollowTarget(mesh: BABYLON.Mesh): void {
-    if (this.camera) {
-      this.camera.setTarget(mesh.position);
+  setFollowTarget(mesh: BABYLON.Mesh | null): void {
+    this.targetMesh = mesh;
+    if (this.camera && mesh) {
+      this.camera.lockedTarget = mesh;
+    }
+  }
+
+  updateCameraTarget(position: BABYLON.Vector3): void {
+    if (this.camera && !this.targetMesh) {
+      this.camera.setTarget(position);
     }
   }
 
@@ -68,22 +73,18 @@ export class BabylonEngine {
       new BABYLON.Vector3(0, 1, 0),
       this.scene
     );
-    hemisphericLight.intensity = 0.6;
-    hemisphericLight.diffuse = new BABYLON.Color3(1, 0.95, 0.9);
-    hemisphericLight.groundColor = new BABYLON.Color3(0.2, 0.2, 0.3);
+    hemisphericLight.intensity = 0.7;
+    hemisphericLight.diffuse = new BABYLON.Color3(1, 0.98, 0.95);
+    hemisphericLight.groundColor = new BABYLON.Color3(0.3, 0.3, 0.4);
 
     const directionalLight = new BABYLON.DirectionalLight(
       'dirLight',
       new BABYLON.Vector3(-1, -2, -1),
       this.scene
     );
-    directionalLight.position = new BABYLON.Vector3(100, 200, 100);
-    directionalLight.intensity = 0.8;
-    directionalLight.diffuse = new BABYLON.Color3(1, 0.95, 0.8);
-
-    const shadowGenerator = new BABYLON.ShadowGenerator(2048, directionalLight);
-    shadowGenerator.useBlurExponentialShadowMap = true;
-    shadowGenerator.blurKernel = 32;
+    directionalLight.position = new BABYLON.Vector3(200, 400, 200);
+    directionalLight.intensity = 0.9;
+    directionalLight.diffuse = new BABYLON.Color3(1, 0.98, 0.9);
   }
 
   private setupSkybox(): void {
@@ -99,17 +100,25 @@ export class BabylonEngine {
     skybox.infiniteDistance = true;
   }
 
+  private setupFog(): void {
+    if (!this.scene) return;
+    
+    this.scene.fogMode = BABYLON.Scene.FOGMODE_EXP2;
+    this.scene.fogDensity = 0.0001;
+    this.scene.fogColor = new BABYLON.Color3(0.7, 0.8, 0.9);
+  }
+
   private setupGround(): void {
     if (!this.scene) return;
 
     const ground = BABYLON.MeshBuilder.CreateGround(
       'ground',
-      { width: 10000, height: 10000 },
+      { width: 20000, height: 20000 },
       this.scene
     );
     const groundMaterial = new BABYLON.StandardMaterial('groundMaterial', this.scene);
-    groundMaterial.diffuseColor = new BABYLON.Color3(0.3, 0.5, 0.2);
-    groundMaterial.specularColor = new BABYLON.Color3(0, 0, 0);
+    groundMaterial.diffuseColor = new BABYLON.Color3(0.35, 0.55, 0.25);
+    groundMaterial.specularColor = new BABYLON.Color3(0.1, 0.1, 0.1);
     ground.material = groundMaterial;
     ground.receiveShadows = true;
     ground.checkCollisions = true;
@@ -121,6 +130,10 @@ export class BabylonEngine {
 
   getEngine(): BABYLON.Engine | null {
     return this.engine;
+  }
+
+  getCamera(): BABYLON.FollowCamera | null {
+    return this.camera;
   }
 
   dispose(): void {
