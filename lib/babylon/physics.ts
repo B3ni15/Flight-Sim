@@ -33,15 +33,20 @@ export class A320Physics {
   private momentOfInertia: BABYLON.Vector3 = new BABYLON.Vector3(2000000, 4000000, 5000000);
   private runwayDirection: BABYLON.Vector3 = new BABYLON.Vector3(0, 0, 1);
   
+  private readonly SPAWN_X = 0;
+  private readonly SPAWN_Y = 2;
+  private readonly SPAWN_Z = -1900;
+  private readonly SPAWN_HEADING = 270;
+  
   constructor() {
     this.state = {
-      position: new BABYLON.Vector3(0, 1, -2000),
+      position: new BABYLON.Vector3(this.SPAWN_X, this.SPAWN_Y, this.SPAWN_Z),
       rotation: BABYLON.Vector3.Zero(),
       velocity: BABYLON.Vector3.Zero(),
       angularVelocity: BABYLON.Vector3.Zero(),
       speed: 0,
-      altitude: 1,
-      heading: 270,
+      altitude: this.SPAWN_Y,
+      heading: this.SPAWN_HEADING,
       pitch: 0,
       roll: 0,
       fuel: 100,
@@ -159,13 +164,13 @@ export class A320Physics {
 
   reset(): void {
     this.state = {
-      position: new BABYLON.Vector3(0, 1, -2000),
+      position: new BABYLON.Vector3(this.SPAWN_X, this.SPAWN_Y, this.SPAWN_Z),
       rotation: BABYLON.Vector3.Zero(),
       velocity: BABYLON.Vector3.Zero(),
       angularVelocity: BABYLON.Vector3.Zero(),
       speed: 0,
-      altitude: 1,
-      heading: 270,
+      altitude: this.SPAWN_Y,
+      heading: this.SPAWN_HEADING,
       pitch: 0,
       roll: 0,
       fuel: 100,

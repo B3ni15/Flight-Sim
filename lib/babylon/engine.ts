@@ -6,6 +6,7 @@ export class BabylonEngine {
   private scene: BABYLON.Scene | null = null;
   private canvas: HTMLCanvasElement | null = null;
   private camera: BABYLON.FollowCamera | null = null;
+  private arcCamera: BABYLON.ArcRotateCamera | null = null;
   private targetMesh: BABYLON.Mesh | null = null;
 
   init(canvas: HTMLCanvasElement): BABYLON.Engine {
@@ -23,14 +24,14 @@ export class BabylonEngine {
 
     this.scene = new BABYLON.Scene(this.engine);
     this.scene.clearColor = new BABYLON.Color4(0.53, 0.81, 0.92, 1);
-    this.scene.ambientColor = new BABYLON.Color3(0.5, 0.5, 0.5);
+    this.scene.ambientColor = new BABYLON.Color3(0.6, 0.6, 0.6);
     this.scene.gravity = new BABYLON.Vector3(0, -9.81, 0);
     this.scene.collisionsEnabled = true;
 
-    this.setupCamera();
     this.setupLights();
     this.setupSkybox();
     this.setupGround();
+    this.setupCamera();
     this.setupFog();
 
     return this.scene;
@@ -39,17 +40,34 @@ export class BabylonEngine {
   private setupCamera(): void {
     if (!this.scene || !this.canvas) return;
 
-    const camera = new BABYLON.FollowCamera('followCamera', new BABYLON.Vector3(0, 10, -50), this.scene);
-    camera.radius = 60;
-    camera.heightOffset = 20;
-    camera.rotationOffset = 180;
-    camera.cameraAcceleration = 0.03;
-    camera.maxCameraSpeed = 20;
-    camera.lowerRadiusLimit = 20;
-    camera.upperRadiusLimit = 150;
-    
-    this.camera = camera;
-    this.scene.activeCamera = camera;
+    this.arcCamera = new BABYLON.ArcRotateCamera(
+      'arcCamera',
+      Math.PI / 2,
+      Math.PI / 3,
+      100,
+      new BABYLON.Vector3(0, 0, -1900),
+      this.scene
+    );
+    this.arcCamera.attachControl(this.canvas, true);
+    this.arcCamera.lowerRadiusLimit = 20;
+    this.arcCamera.upperRadiusLimit = 300;
+    this.arcCamera.lowerBetaLimit = 0.1;
+    this.arcCamera.upperBetaLimit = Math.PI / 2 - 0.1;
+
+    this.camera = new BABYLON.FollowCamera(
+      'followCamera',
+      new BABYLON.Vector3(0, 30, -100),
+      this.scene
+    );
+    this.camera.radius = 80;
+    this.camera.heightOffset = 30;
+    this.camera.rotationOffset = 180;
+    this.camera.cameraAcceleration = 0.02;
+    this.camera.maxCameraSpeed = 30;
+    this.camera.lowerRadiusLimit = 30;
+    this.camera.upperRadiusLimit = 200;
+
+    this.scene.activeCamera = this.arcCamera;
   }
 
   setFollowTarget(mesh: BABYLON.Mesh | null): void {
@@ -57,11 +75,23 @@ export class BabylonEngine {
     if (this.camera && mesh) {
       this.camera.lockedTarget = mesh;
     }
+    if (this.arcCamera && mesh) {
+      this.arcCamera.setTarget(mesh.position);
+    }
   }
 
-  updateCameraTarget(position: BABYLON.Vector3): void {
-    if (this.camera && !this.targetMesh) {
-      this.camera.setTarget(position);
+  switchToFollowCamera(): void {
+    if (this.camera && this.scene) {
+      this.scene.activeCamera = this.camera;
+      if (this.targetMesh) {
+        this.camera.lockedTarget = this.targetMesh;
+      }
+    }
+  }
+
+  switchToArcCamera(): void {
+    if (this.arcCamera && this.scene) {
+      this.scene.activeCamera = this.arcCamera;
     }
   }
 
@@ -73,18 +103,26 @@ export class BabylonEngine {
       new BABYLON.Vector3(0, 1, 0),
       this.scene
     );
-    hemisphericLight.intensity = 0.7;
+    hemisphericLight.intensity = 0.8;
     hemisphericLight.diffuse = new BABYLON.Color3(1, 0.98, 0.95);
-    hemisphericLight.groundColor = new BABYLON.Color3(0.3, 0.3, 0.4);
+    hemisphericLight.groundColor = new BABYLON.Color3(0.4, 0.4, 0.5);
 
     const directionalLight = new BABYLON.DirectionalLight(
       'dirLight',
       new BABYLON.Vector3(-1, -2, -1),
       this.scene
     );
-    directionalLight.position = new BABYLON.Vector3(200, 400, 200);
-    directionalLight.intensity = 0.9;
+    directionalLight.position = new BABYLON.Vector3(500, 800, 500);
+    directionalLight.intensity = 1.0;
     directionalLight.diffuse = new BABYLON.Color3(1, 0.98, 0.9);
+
+    const pointLight = new BABYLON.PointLight(
+      'pointLight',
+      new BABYLON.Vector3(0, 50, -1900),
+      this.scene
+    );
+    pointLight.intensity = 0.5;
+    pointLight.diffuse = new BABYLON.Color3(1, 1, 1);
   }
 
   private setupSkybox(): void {
@@ -104,7 +142,7 @@ export class BabylonEngine {
     if (!this.scene) return;
     
     this.scene.fogMode = BABYLON.Scene.FOGMODE_EXP2;
-    this.scene.fogDensity = 0.0001;
+    this.scene.fogDensity = 0.00005;
     this.scene.fogColor = new BABYLON.Color3(0.7, 0.8, 0.9);
   }
 
@@ -134,6 +172,10 @@ export class BabylonEngine {
 
   getCamera(): BABYLON.FollowCamera | null {
     return this.camera;
+  }
+
+  getArcCamera(): BABYLON.ArcRotateCamera | null {
+    return this.arcCamera;
   }
 
   dispose(): void {

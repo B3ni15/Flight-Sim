@@ -56,6 +56,7 @@ export default function BabylonScene() {
   });
   const lastUpdateRef = useRef<number>(0);
   const hasTakenOffRef = useRef<boolean>(false);
+  const sceneRef = useRef<BABYLON.Scene | null>(null);
   
   const {
     setSpeed,
@@ -119,6 +120,17 @@ export default function BabylonScene() {
       case 'Space':
         inputRef.current.brake = isDown;
         break;
+      case 'KeyC':
+        if (isDown) {
+          const camera = babylonEngine.getCamera();
+          const arcCamera = babylonEngine.getArcCamera();
+          if (camera && sceneRef.current?.activeCamera !== camera) {
+            babylonEngine.switchToFollowCamera();
+          } else if (arcCamera) {
+            babylonEngine.switchToArcCamera();
+          }
+        }
+        break;
     }
     
     planeRef.current.setInput(inputRef.current);
@@ -131,11 +143,12 @@ export default function BabylonScene() {
     engineRef.current = engine;
     
     const scene = babylonEngine.createScene();
+    sceneRef.current = scene;
+    
+    const airport = createAirport(scene);
     
     const plane = createPlane(scene);
     planeRef.current = plane;
-    
-    const airport = createAirport(scene);
     
     plane.loadModel('/models/a320.glb').catch(() => {
       console.log('Using procedural A320 model');
@@ -144,6 +157,11 @@ export default function BabylonScene() {
     const mesh = plane.getMesh();
     if (mesh) {
       babylonEngine.setFollowTarget(mesh);
+      
+      const arcCamera = babylonEngine.getArcCamera();
+      if (arcCamera) {
+        arcCamera.setTarget(mesh.position);
+      }
     }
     
     engine.runRenderLoop(() => {
@@ -240,7 +258,7 @@ export default function BabylonScene() {
     if (!engineRef.current || !planeRef.current) return;
     
     const engine = engineRef.current;
-    const scene = babylonEngine.getScene();
+    const scene = sceneRef.current;
     const socket = socketRef.current;
     if (!scene) return;
 
